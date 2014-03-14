@@ -1,5 +1,10 @@
 //Head file of TLL's CPU Simulator
 
+#define TC0 0
+//Machine TC0's version is 0 0
+
+//define pause_keyname "<Space>"//Space key to pause
+//define pause_keyid 32
 
 //Code's length define(bytes)
 #define CodeI 1
@@ -9,7 +14,9 @@
 #define CodeIII 2
 //4-bit Opcode+4-bit zero+8-bit IMM(int)
 #define CodeIV 2
-//4-bit Opcode+4-bit zero+4-bit Reg1+4-bit Reg2
+//4-bit Opcode+4-bit Reg1+4-bit Reg2+4-bit zero
+#define CodeV 2
+//4-bit Opcode+4-bit Reg1+4-bit Reg2+4-bit Reg3
 
 //Opcode define
 #define ADD 0
@@ -42,8 +49,8 @@
 #define JE 9
 #define JE_L CodeIV
 
-#define JC 0xA
-#define JC_L CodeII
+#define JS 0xA
+#define JS_L CodeV
 
 #define JMP 0xB
 #define JMP_L CodeII
@@ -58,4 +65,4 @@
 #define JL_L CodeIV
 
 #define NOP 0xF
-#define NIO_L CodeI
+#define NOP_L CodeI
