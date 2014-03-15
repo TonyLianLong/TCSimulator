@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <curses.h>
 #include "self_string.h"
 #include "TCS.h"
 
@@ -116,19 +115,35 @@ void shell(){
 		printf("Memory Address:%llu\n",addr);
 	}else if(char_input == 'r'){
 		uint8_t getaspace = getchar();
-		if(getaspace != ' '){
-			printf("Unknown argument,type \"h\" for help.\n");
-			not_exit = 1;
-			if(getaspace == '\n')return;		
-		}else{
+		//if(getaspace != ' '){
+			//printf("Unknown argument,type \"h\" for help.\n");
+			//not_exit = 1;
+			while(1){
+				if(getaspace == '\n'){
+					not_exit = 1;
+					fprintf(stderr,"Unknown argument,type \"h\" for help.\n");
+					return;	
+				}else{
+					if(getaspace == ' '){
+						unsigned int rarg1 = 0;
+						scanf("%i",&rarg1);
+						ns = 1;//No Stopping
+						nsaddr = rarg1;
+						printf("Will not stop until 0x%x\n",nsaddr);
+						break;
+					}
+				}
+				getaspace = getchar();
+			}
+		/*}else{
 			unsigned int rarg1 = 0;
 			scanf("%i",&rarg1);
 			ns = 1;//No Stopping
 			nsaddr = rarg1;
 			printf("Will not stop until 0x%x\n",nsaddr);
-		}
+		}*/
 	}else{
-		printf("Unknown code,type \"h\" for help.\n");
+		fprintf(stderr,"Unknown code,type \"h\" for help.\n");
 		not_exit = 1;
 	}
 	while(getchar() != '\n');
@@ -145,31 +160,40 @@ unsigned int runcode(unsigned char *data,unsigned long size){
 	uint8_t barg2 = 0;//For Special IMM Command
 	uint8_t arg2 = 0;
 	uint8_t jump;
+	uint8_t error = 0;
 	char char_input;
-	unsigned long long i=0;
-	for(i=0;i<size;i++){
-		RAM[i] = data[i];
+	unsigned long long n=0;
+	for(n=0;n<size;n++){
+		RAM[n] = data[n];
 	}//Load 1K data from SPI Flash to RAM
-	while(i<1024){
-		RAM[i] = 0;//Fill 0
-		i++;
+	while(n<1024){
+		RAM[n] = 0;//Fill 0
+		n++;
 	}
+	n = 0;
 	printf("Press <Enter> Key to pause the simulator.\n");
 	for(addr=0;addr<sizeof(RAM);){
 		if(ns == 1){//No Stopping
 			//ns = 0;
 			//shell();
-			if(i > nsaddr){
+			if(addr > nsaddr){
 				ns = 0;
+				if(error != 1){
+					printf("OK,stop at 0x%llx(%llu)\n",addr,addr);
+					do{
+						shell();
+					}while(not_exit);
+					error = 0;				
+				}
+			}
+		}else{
+			if(error != 1){
 				do{
 					shell();
 				}while(not_exit);
 			}
-		}else{
-			do{
-				shell();
-			}while(not_exit);
 		}
+		error = 0;
 		opcode = RAM[addr]>>4;
 		arg1 = RAM[addr] & 0xF;
 		setback = 1;
@@ -240,6 +264,18 @@ unsigned int runcode(unsigned char *data,unsigned long size){
 					jump = 1;				
 				}
 			break;
+			case JS:
+				back = 0;
+				setback = 0;
+				addr++;
+				arg2 = RAM[addr]>>4;
+				//X X X X 0 0 0 0
+				//A R G 2|Z E R O
+				if(((SimpleRegister[0]>>7)&0xf == 0) && SimpleRegister[0] != 0){
+					addr = SimpleRegister[arg1]<<8&SimpleRegister[arg2];
+					jump = 1;
+				}
+			break;
 			case JMP:
 				debug2("JMP at %llu\n",addr);
 				back = 0;
@@ -250,6 +286,39 @@ unsigned int runcode(unsigned char *data,unsigned long size){
 				//A R G 2|Z E R O
 				jump = 1;
 				addr = SimpleRegister[arg1]<<8&SimpleRegister[arg2];
+			break;
+			case RMV:
+				back = 0;
+				setback = 0;
+				SimpleRegister[0] >>= SimpleRegister[arg1]&0x7;
+			break;
+			case GETF://Will not work in real TC0v01
+				addr++;
+				arg2 = RAM[addr]>>4;
+				//X X X X 0 0 0 0
+				//A R G 2|Z E R O
+				back = data[SimpleRegister[arg1]<<16&SimpleRegister[arg2]<<8&SimpleRegister[0]];
+			break;
+			case JL:
+				back = 0;
+				setback = 0;
+				addr++;
+				arg2 = RAM[addr]>>4;
+				//X X X X 0 0 0 0
+				//A R G 2|Z E R O
+				if((SimpleRegister[0]>>7)&0xf == 1){
+					addr = SimpleRegister[arg1]<<8&SimpleRegister[arg2];
+					jump = 1;
+				}
+			break;
+			case NOP://Maybe will remove in TC0v01 or newer version?
+				back = 0;
+				setback = 0;
+				//Nothing,you can add your self code and use this opcode to have a test,e.g. show registers.
+			break;
+			default:
+				fprintf(stderr,"Unknown opcode:0x%x!\n",opcode);
+				error = 1;
 			break;
 		}
 		if(setback != 0){
@@ -274,6 +343,11 @@ unsigned int runcode(unsigned char *data,unsigned long size){
 		}else{
 			debug("No key input.\n");
 		}*/
+		if(error == 1){
+			do{
+				shell();
+			}while(not_exit);
+		}
 		debug2("Address:%llu\n",addr);
 	}
 	printf("Finished!\n");
